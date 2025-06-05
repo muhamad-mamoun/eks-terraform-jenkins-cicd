@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('GitOps Checkout') {
+            steps {
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/muhamad-mamoun/eks-terraform-jenkins-cicd.git']])
+            }
+        }
+
+        stage('Run Agent') {
+            agent {
+                kubernetes {
+                    yamlFile 'Jenkins/Agents/kaniko.yaml'
+                }
+            }
+        }
+        
+        stage('App Checkout') {
+            steps {
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/muhamad-mamoun/full-stack-todo-list-app.git']])
+            }
+        }
+
+        stage('Frontend CI') {
+            steps {
+                container('kaniko') {
+                    script {
+                        sh '''
+                        /kaniko/executor --dockerfile `pwd`/frontend/Dockerfile \
+                                         --context `pwd`/frontend \
+                                         --destination=729798775365.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Backend CI') {
+            steps {
+                container('kaniko') {
+                    script {
+                        sh '''
+                        /kaniko/executor --dockerfile `pwd`/backend/Dockerfile \
+                                         --context `pwd`/backend \
+                                         --destination=729798775365.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
